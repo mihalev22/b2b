@@ -20,9 +20,13 @@ docs/      контракты, ADR, метрики (Артас)
 3. PR маленькие: одна задача, ~до 400 строк
 4. Merge жмёт только Артас — `main` всегда рабочий
 
-## Запуск (позже)
+## Запуск
+
+Пока готов backend (api + worker + redis + postgres):
 
 ```bash
-cp .env.example .env
+cd backend
 docker-compose up --build
 ```
+
+Полный стек (6 сервисов) собирает архитектор. Примеры API-запросов — в `backend/README.md`.

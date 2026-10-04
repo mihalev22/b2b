@@ -1,0 +1,575 @@
+openapi: 3.1.0
+info:
+  title: КТРУ-классификатор API
+  description: Сопоставление позиций спецификаций с кодами КТРУ
+  version: 0.1.0
+paths:
+  /api/v1/health:
+    get:
+      tags:
+      - health
+      summary: Health
+      operationId: health_api_v1_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/jobs:
+    post:
+      tags:
+      - jobs
+      summary: Create Job
+      operationId: create_job_api_v1_jobs_post
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_create_job_api_v1_jobs_post'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCreated'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - jobs
+      summary: List Jobs
+      operationId: list_jobs_api_v1_jobs_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/jobs/{job_id}:
+    get:
+      tags:
+      - jobs
+      summary: Get Job
+      operationId: get_job_api_v1_jobs__job_id__get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/jobs/{job_id}/items:
+    get:
+      tags:
+      - jobs
+      summary: List Items
+      operationId: list_items_api_v1_jobs__job_id__items_get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Status
+      - name: min_confidence
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            maximum: 100
+            minimum: 0
+          - type: 'null'
+          title: Min Confidence
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+          title: Q
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/jobs/{job_id}/export:
+    get:
+      tags:
+      - jobs
+      summary: Export Job
+      operationId: export_job_api_v1_jobs__job_id__export_get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(csv)$
+          default: csv
+          title: Format
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/items/{item_id}:
+    patch:
+      tags:
+      - items
+      summary: Correct Item
+      operationId: correct_item_api_v1_items__item_id__patch
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCorrection'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/ktru/search:
+    get:
+      tags:
+      - catalog
+      summary: Search Catalog
+      operationId: search_catalog_api_v1_ktru_search_get
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 256
+          title: Q
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 10
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Body_create_job_api_v1_jobs_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_create_job_api_v1_jobs_post
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthComponent:
+      properties:
+        name:
+          type: string
+          title: Name
+        ok:
+          type: boolean
+          title: Ok
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - name
+      - ok
+      - detail
+      title: HealthComponent
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        version:
+          type: string
+          title: Version
+        components:
+          items:
+            $ref: '#/components/schemas/HealthComponent'
+          type: array
+          title: Components
+      type: object
+      required:
+      - status
+      - version
+      - components
+      title: HealthResponse
+    ItemCorrection:
+      properties:
+        ktru_code:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Ktru Code
+        ktru_name:
+          anyOf:
+          - type: string
+            maxLength: 512
+          - type: 'null'
+          title: Ktru Name
+      type: object
+      required:
+      - ktru_code
+      title: ItemCorrection
+    ItemOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        job_id:
+          type: string
+          format: uuid
+          title: Job Id
+        row_number:
+          type: integer
+          title: Row Number
+        raw_name:
+          type: string
+          title: Raw Name
+        raw_columns:
+          additionalProperties: true
+          type: object
+          title: Raw Columns
+        attributes:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Attributes
+        ktru_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ktru Code
+        ktru_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ktru Name
+        confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Confidence
+        method:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Method
+        status:
+          type: string
+          title: Status
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - job_id
+      - row_number
+      - raw_name
+      - raw_columns
+      - attributes
+      - ktru_code
+      - ktru_name
+      - confidence
+      - method
+      - status
+      - updated_at
+      title: ItemOut
+    ItemPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ItemOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: ItemPage
+    JobCreated:
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          title: Job Id
+        status:
+          type: string
+          title: Status
+        filename:
+          type: string
+          title: Filename
+      type: object
+      required:
+      - job_id
+      - status
+      - filename
+      title: JobCreated
+    JobOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        filename:
+          type: string
+          title: Filename
+        status:
+          type: string
+          title: Status
+        total_count:
+          type: integer
+          title: Total Count
+        processed_count:
+          type: integer
+          title: Processed Count
+        failed_count:
+          type: integer
+          title: Failed Count
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        parse_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Parse Seconds
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - filename
+      - status
+      - total_count
+      - processed_count
+      - failed_count
+      - error
+      - parse_seconds
+      - created_at
+      - started_at
+      - finished_at
+      title: JobOut
+    JobPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/JobOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: JobPage
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
