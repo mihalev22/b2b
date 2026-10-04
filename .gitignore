@@ -1,0 +1,29 @@
+# env — никогда не коммитим .env
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# данные: дампы КТРУ не в гите, лежат локально в data/
+data/*
+!data/.gitkeep
+*.xlsx
+*.csv
+*.xml
+*.zip
+
+# …кроме тестовых образцов
+!backend/tests/fixtures/*
+!frontend/mocks/*
+
+# node
+node_modules/
+dist/
+
+# ide / os
+.idea/
+.vscode/
+.DS_Store
