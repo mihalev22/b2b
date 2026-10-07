@@ -1,3 +1,5 @@
+import uuid
+
 from conftest import CSV_CONTENT
 
 
@@ -60,6 +62,8 @@ async def test_full_flow_upload_status_items_correction_export(client):
     raw_names = {item["raw_name"] for item in page["items"]}
     assert raw_names == {"Ноутбук Dell Latitude 5540", "Кабель ПВС 3х1.5"}
     assert page["items"][0]["status"] == "pending"
+    assert page["items"][0]["candidates"] == []
+    assert page["items"][0]["attributes"] is None
 
     filtered = await client.get(f"/api/v1/jobs/{job_id}/items", params={"q": "Кабель"})
     assert filtered.json()["total"] == 1
@@ -79,10 +83,8 @@ async def test_full_flow_upload_status_items_correction_export(client):
     assert patched["status"] == "corrected"
     assert patched["method"] == "manual"
 
-    corrected = await client.get(
-        f"/api/v1/jobs/{job_id}/items", params={"status": "corrected"}
-    )
-    assert corrected.json()["total"] == 1
+    job_status = await client.get(f"/api/v1/jobs/{job_id}")
+    assert job_status.json()["corrected_count"] == 1
 
     export = await client.get(f"/api/v1/jobs/{job_id}/export")
     assert export.status_code == 200
@@ -96,17 +98,104 @@ async def test_full_flow_upload_status_items_correction_export(client):
     assert jobs_list.json()["total"] >= 1
 
 
-async def test_items_pagination(client):
+async def test_accept_and_revert(client):
     upload = await client.post(
         "/api/v1/jobs",
         files={"file": ("spec.csv", CSV_CONTENT, "text/csv")},
     )
     job_id = upload.json()["job_id"]
+    items = (await client.get(f"/api/v1/jobs/{job_id}/items")).json()["items"]
+    item_id = items[0]["id"]
+
+    accept = await client.post(f"/api/v1/items/{item_id}/accept")
+    assert accept.status_code == 409
+
+    patch = await client.patch(
+        f"/api/v1/items/{item_id}",
+        json={"ktru_code": "26.20.11.110-00000009"},
+    )
+    assert patch.json()["status"] == "corrected"
+
+    accept = await client.post(f"/api/v1/items/{item_id}/accept")
+    assert accept.status_code == 200
+    assert accept.json()["status"] == "accepted"
+
+    revert = await client.post(f"/api/v1/items/{item_id}/revert")
+    assert revert.status_code == 200
+    reverted = revert.json()
+    assert reverted["ktru_code"] is None
+    assert reverted["status"] == "pending"
+
+    revert_again = await client.post(f"/api/v1/items/{item_id}/revert")
+    assert revert_again.status_code == 409
+
+
+async def test_bulk_accept(client):
+    upload = await client.post(
+        "/api/v1/jobs",
+        files={"file": ("spec.csv", CSV_CONTENT, "text/csv")},
+    )
+    job_id = upload.json()["job_id"]
+
+    from sqlalchemy import update
+
+    from app.db import session as db_session
+    from app.models.entities import Item
+
+    async with db_session.AsyncSessionLocal() as session:
+        await session.execute(
+            update(Item)
+            .where(Item.job_id == uuid.UUID(job_id))
+            .values(confidence=90.0, status="auto")
+        )
+        await session.commit()
+
+    bulk = await client.post(f"/api/v1/jobs/{job_id}/accept", json={"min_confidence": 85})
+    assert bulk.status_code == 200
+    assert bulk.json()["accepted_count"] == 2
+
+    job_status = await client.get(f"/api/v1/jobs/{job_id}")
+    assert job_status.json()["auto_count"] == 0
+
+    items = await client.get(f"/api/v1/jobs/{job_id}/items", params={"status": "accepted"})
+    assert items.json()["total"] == 2
+
+
+async def test_items_sorting_and_filters(client):
+    upload = await client.post(
+        "/api/v1/jobs",
+        files={"file": ("spec.csv", CSV_CONTENT, "text/csv")},
+    )
+    job_id = upload.json()["job_id"]
+
     page = await client.get(f"/api/v1/jobs/{job_id}/items", params={"limit": 1})
-    body = page.json()
-    assert len(body["items"]) == 1
-    assert body["total"] == 2
-    assert body["limit"] == 1
+    assert len(page.json()["items"]) == 1
+    assert page.json()["total"] == 2
+    assert page.json()["limit"] == 1
+
+    sorted_desc = await client.get(
+        f"/api/v1/jobs/{job_id}/items",
+        params={"sort_by": "row_number", "sort_order": "desc", "limit": 1},
+    )
+    assert sorted_desc.json()["items"][0]["raw_name"] == "Кабель ПВС 3х1.5"
+
+    filtered = await client.get(
+        f"/api/v1/jobs/{job_id}/items",
+        params={"min_confidence": 50},
+    )
+    assert filtered.json()["total"] == 0
+
+
+async def test_xlsx_export(client):
+    upload = await client.post(
+        "/api/v1/jobs",
+        files={"file": ("spec.csv", CSV_CONTENT, "text/csv")},
+    )
+    job_id = upload.json()["job_id"]
+    export = await client.get(f"/api/v1/jobs/{job_id}/export", params={"format": "xlsx"})
+    assert export.status_code == 200
+    assert "spreadsheetml" in export.headers["content-type"]
+    assert export.content[:2] == b"PK"
 
 
 async def test_patch_unknown_item_returns_404(client):
@@ -122,3 +211,9 @@ async def test_patch_unknown_item_returns_404(client):
 async def test_ktru_search_returns_501(client):
     response = await client.get("/api/v1/ktru/search", params={"q": "ноутбук"})
     assert response.status_code == 501
+
+
+async def test_ktru_position_returns_501(client):
+    response = await client.get("/api/v1/ktru/26.20.11.110-00000009")
+    assert response.status_code == 501
+

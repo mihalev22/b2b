@@ -44,6 +44,7 @@ class Item(Base):
     raw_name: Mapped[str] = mapped_column(Text)
     raw_columns: Mapped[dict] = mapped_column(JsonColumn)
     attributes: Mapped[dict | None] = mapped_column(JsonColumn)
+    candidates: Mapped[list | None] = mapped_column(JsonColumn)
     ktru_code: Mapped[str | None] = mapped_column(String(32))
     ktru_name: Mapped[str | None] = mapped_column(String(512))
     confidence: Mapped[float | None] = mapped_column(Float)
@@ -65,4 +66,5 @@ class Correction(Base):
     job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
     old_code: Mapped[str | None] = mapped_column(String(32))
     new_code: Mapped[str] = mapped_column(String(32))
+    previous_status: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

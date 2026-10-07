@@ -155,6 +155,16 @@ paths:
             minimum: 0
           - type: 'null'
           title: Min Confidence
+      - name: max_confidence
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            maximum: 100
+            minimum: 0
+          - type: 'null'
+          title: Max Confidence
       - name: q
         in: query
         required: false
@@ -164,6 +174,27 @@ paths:
             maxLength: 256
           - type: 'null'
           title: Q
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          enum:
+          - row_number
+          - confidence
+          - updated_at
+          type: string
+          default: row_number
+          title: Sort By
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          enum:
+          - asc
+          - desc
+          type: string
+          default: asc
+          title: Sort Order
       responses:
         '200':
           description: Successful Response
@@ -171,6 +202,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/jobs/{job_id}/accept:
+    post:
+      tags:
+      - jobs
+      summary: Accept Items
+      operationId: accept_items_api_v1_jobs__job_id__accept_post
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Job Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAccept'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAcceptResult'
         '422':
           description: Validation Error
           content:
@@ -195,8 +259,10 @@ paths:
         in: query
         required: false
         schema:
+          enum:
+          - csv
+          - xlsx
           type: string
-          pattern: ^(csv)$
           default: csv
           title: Format
       responses:
@@ -244,6 +310,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/items/{item_id}/accept:
+    post:
+      tags:
+      - items
+      summary: Accept Item
+      operationId: accept_item_api_v1_items__item_id__accept_post
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/items/{item_id}/revert:
+    post:
+      tags:
+      - items
+      summary: Revert Item
+      operationId: revert_item_api_v1_items__item_id__revert_post
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Item Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/ktru/search:
     get:
       tags:
@@ -273,7 +393,34 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/KtruSearchPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/ktru/{ktru_code}:
+    get:
+      tags:
+      - catalog
+      summary: Get Position
+      operationId: get_position_api_v1_ktru__ktru_code__get
+      parameters:
+      - name: ktru_code
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Ktru Code
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KtruPositionOut'
         '422':
           description: Validation Error
           content:
@@ -292,6 +439,65 @@ components:
       required:
       - file
       title: Body_create_job_api_v1_jobs_post
+    BulkAccept:
+      properties:
+        min_confidence:
+          type: number
+          maximum: 100.0
+          minimum: 0.0
+          title: Min Confidence
+          description: Принять все позиции с уверенностью не ниже
+      type: object
+      required:
+      - min_confidence
+      title: BulkAccept
+      example:
+        min_confidence: 85
+    BulkAcceptResult:
+      properties:
+        accepted_count:
+          type: integer
+          title: Accepted Count
+      type: object
+      required:
+      - accepted_count
+      title: BulkAcceptResult
+    CandidateOut:
+      properties:
+        ktru_code:
+          type: string
+          title: Ktru Code
+        ktru_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ktru Name
+        confidence:
+          type: number
+          title: Confidence
+      type: object
+      required:
+      - ktru_code
+      - confidence
+      title: CandidateOut
+    Characteristic:
+      properties:
+        name:
+          type: string
+          title: Name
+        value:
+          type: string
+          title: Value
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+      type: object
+      required:
+      - name
+      - value
+      title: Characteristic
     HTTPValidationError:
       properties:
         detail:
@@ -337,6 +543,30 @@ components:
       - version
       - components
       title: HealthResponse
+    ItemAttributes:
+      properties:
+        name:
+          type: string
+          title: Name
+        brand:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Brand
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        characteristics:
+          items:
+            $ref: '#/components/schemas/Characteristic'
+          type: array
+          title: Characteristics
+      type: object
+      required:
+      - name
+      title: ItemAttributes
     ItemCorrection:
       properties:
         ktru_code:
@@ -376,10 +606,8 @@ components:
           title: Raw Columns
         attributes:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - $ref: '#/components/schemas/ItemAttributes'
           - type: 'null'
-          title: Attributes
         ktru_code:
           anyOf:
           - type: string
@@ -402,7 +630,18 @@ components:
           title: Method
         status:
           type: string
+          enum:
+          - pending
+          - auto
+          - needs_review
+          - accepted
+          - corrected
           title: Status
+        candidates:
+          items:
+            $ref: '#/components/schemas/CandidateOut'
+          type: array
+          title: Candidates
         updated_at:
           type: string
           format: date-time
@@ -414,7 +653,6 @@ components:
       - row_number
       - raw_name
       - raw_columns
-      - attributes
       - ktru_code
       - ktru_name
       - confidence
@@ -422,6 +660,32 @@ components:
       - status
       - updated_at
       title: ItemOut
+      example:
+        attributes:
+          brand: Dell
+          characteristics:
+          - name: ОЗУ
+            unit: ГБ
+            value: '16'
+          model: Latitude 5540
+          name: Ноутбук
+        candidates:
+        - confidence: 94.0
+          ktru_code: 26.20.11.110-00000009
+          ktru_name: Машины вычислительные портативные
+        confidence: 94.0
+        id: 01aaa595-b008-4229-8a74-c3ac387f0261
+        job_id: c82cc353-9233-4ba2-8270-4f0139f37774
+        ktru_code: 26.20.11.110-00000009
+        ktru_name: Машины вычислительные портативные
+        method: hybrid
+        raw_columns:
+          Наименование товара: Ноутбук Dell
+          №: '1'
+        raw_name: Ноутбук Dell Latitude 5540 16 ГБ
+        row_number: 2
+        status: auto
+        updated_at: '2026-10-05T15:41:27.812874Z'
     ItemPage:
       properties:
         items:
@@ -453,6 +717,11 @@ components:
           title: Job Id
         status:
           type: string
+          enum:
+          - queued
+          - processing
+          - done
+          - failed
           title: Status
         filename:
           type: string
@@ -463,6 +732,10 @@ components:
       - status
       - filename
       title: JobCreated
+      example:
+        filename: spec.csv
+        job_id: c82cc353-9233-4ba2-8270-4f0139f37774
+        status: queued
     JobOut:
       properties:
         id:
@@ -474,6 +747,11 @@ components:
           title: Filename
         status:
           type: string
+          enum:
+          - queued
+          - processing
+          - done
+          - failed
           title: Status
         total_count:
           type: integer
@@ -484,6 +762,18 @@ components:
         failed_count:
           type: integer
           title: Failed Count
+        auto_count:
+          type: integer
+          title: Auto Count
+          default: 0
+        needs_review_count:
+          type: integer
+          title: Needs Review Count
+          default: 0
+        corrected_count:
+          type: integer
+          title: Corrected Count
+          default: 0
         error:
           anyOf:
           - type: string
@@ -524,6 +814,20 @@ components:
       - started_at
       - finished_at
       title: JobOut
+      example:
+        auto_count: 3
+        corrected_count: 0
+        created_at: '2026-10-05T15:41:27.454156Z'
+        failed_count: 0
+        filename: spec.csv
+        finished_at: '2026-10-05T15:41:27.817763Z'
+        id: c82cc353-9233-4ba2-8270-4f0139f37774
+        needs_review_count: 1
+        parse_seconds: 0.019
+        processed_count: 4
+        started_at: '2026-10-05T15:41:27.792843Z'
+        status: done
+        total_count: 4
     JobPage:
       properties:
         items:
@@ -547,6 +851,56 @@ components:
       - limit
       - offset
       title: JobPage
+    KtruPositionOut:
+      properties:
+        ktru_code:
+          type: string
+          title: Ktru Code
+        ktru_name:
+          type: string
+          title: Ktru Name
+        okpd2_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Okpd2 Code
+        characteristics:
+          items:
+            $ref: '#/components/schemas/Characteristic'
+          type: array
+          title: Characteristics
+      type: object
+      required:
+      - ktru_code
+      - ktru_name
+      title: KtruPositionOut
+      example:
+        characteristics:
+        - name: масса
+          unit: кг
+          value: не более 10
+        ktru_code: 26.20.11.110-00000009
+        ktru_name: Машины вычислительные портативные
+        okpd2_code: 26.20.11.110
+    KtruSearchPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/KtruPositionOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      title: KtruSearchPage
     ValidationError:
       properties:
         loc:
