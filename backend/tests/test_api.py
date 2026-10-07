@@ -198,6 +198,33 @@ async def test_xlsx_export(client):
     assert export.content[:2] == b"PK"
 
 
+async def test_upload_rejects_fake_xlsx(client):
+    response = await client.post(
+        "/api/v1/jobs",
+        files={"file": ("spec.xlsx", b"not a zip archive", "application/octet-stream")},
+    )
+    assert response.status_code == 422
+    assert "xlsx" in response.json()["detail"]
+
+
+async def test_csv_export_escapes_formula_injection(client):
+    upload = await client.post(
+        "/api/v1/jobs",
+        files={"file": ("spec.csv", CSV_CONTENT, "text/csv")},
+    )
+    job_id = upload.json()["job_id"]
+    items = (await client.get(f"/api/v1/jobs/{job_id}/items")).json()["items"]
+    item_id = items[0]["id"]
+    await client.patch(
+        f"/api/v1/items/{item_id}",
+        json={"ktru_code": "=HYPERLINK(\"http://evil\")", "ktru_name": "=SUM(1+1)"},
+    )
+    export = await client.get(f"/api/v1/jobs/{job_id}/export")
+    text = export.content.decode("utf-8-sig")
+    assert "'=HYPERLINK" in text
+    assert "'=SUM" in text
+
+
 async def test_patch_unknown_item_returns_404(client):
     import uuid
 

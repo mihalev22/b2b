@@ -22,9 +22,17 @@ def _rows(items: list[Item]) -> list[list]:
     return rows
 
 
+def _csv_safe(value):
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return f"'{value}"
+    return value
+
+
 def items_to_csv(items: list[Item]) -> bytes:
     buffer = io.StringIO()
-    csv.writer(buffer, delimiter=";").writerows(_rows(items))
+    writer = csv.writer(buffer, delimiter=";")
+    for row in _rows(items):
+        writer.writerow([_csv_safe(cell) for cell in row])
     return buffer.getvalue().encode("utf-8-sig")
 
 

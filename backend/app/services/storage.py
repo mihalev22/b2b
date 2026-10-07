@@ -11,6 +11,19 @@ class UploadTooLarge(Exception):
     pass
 
 
+class BadFileContent(Exception):
+    pass
+
+
+async def check_magic(destination: Path, extension: str) -> None:
+    if extension != ".xlsx":
+        return
+    async with aiofiles.open(destination, "rb") as source:
+        header = await source.read(2)
+    if header != b"PK":
+        raise BadFileContent("Файл повреждён или не является корректным xlsx")
+
+
 def upload_path(job: Job) -> Path:
     return Path(get_settings().uploads_dir) / f"{job.id}{job.file_ext}"
 

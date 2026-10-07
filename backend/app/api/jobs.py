@@ -23,7 +23,13 @@ from app.schemas.job import (
 )
 from app.services.exporter import items_to_csv, items_to_xlsx
 from app.services.queue import enqueue_process_job
-from app.services.storage import UploadTooLarge, save_upload, upload_path
+from app.services.storage import (
+    BadFileContent,
+    UploadTooLarge,
+    check_magic,
+    save_upload,
+    upload_path,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -85,10 +91,15 @@ async def create_job(
     destination = upload_path(job)
     try:
         await save_upload(file, destination, settings.max_upload_mb * 1024 * 1024)
+        await check_magic(destination, extension)
     except UploadTooLarge:
         destination.unlink(missing_ok=True)
         await session.rollback()
         raise HTTPException(413, f"Файл больше {settings.max_upload_mb} МБ") from None
+    except BadFileContent as exc:
+        destination.unlink(missing_ok=True)
+        await session.rollback()
+        raise HTTPException(422, str(exc)) from None
     set_job_context(job.id)
     await session.commit()
 
@@ -159,7 +170,8 @@ async def list_items(
     if max_confidence is not None:
         filters.append(Item.confidence <= max_confidence)
     if q:
-        filters.append(Item.raw_name.ilike(f"%{q}%"))
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        filters.append(Item.raw_name.ilike(f"%{escaped}%", escape="\\"))
     total = await session.scalar(select(func.count()).select_from(Item).where(*filters))
     column = {
         "row_number": Item.row_number,
