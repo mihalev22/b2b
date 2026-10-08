@@ -1,0 +1,52 @@
+services:
+  ollama:
+    build:
+      context: .
+      target: ollama-runtime
+      args:
+        TEXT_MODEL: ${TEXT_MODEL:-qwen3.5:2b-q4_K_M}
+        EMBED_MODEL: ${EMBED_MODEL:-embeddinggemma:300m}
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # CPU по умолчанию: GPU не является обязательным условием запуска.
+
+  database:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ktru
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - database_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ktru"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      TEXT_MODEL: ${TEXT_MODEL:-qwen3.5:2b-q4_K_M}
+      VISION_MODEL: ${TEXT_MODEL:-qwen3.5:2b-q4_K_M}
+      EMBED_MODEL: ${EMBED_MODEL:-embeddinggemma:300m}
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@database:5432/ktru
+      KTRU_CATALOG: /app/data/ktru_catalog.json
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+
+volumes:
+  database_data:
