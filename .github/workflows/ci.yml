@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Ruff
+        run: ruff check .
+      - name: Pytest
+        run: python -m pytest -q
+      - name: Контракт API совпадает с кодом
+        run: |
+          python scripts/export_openapi.py
+          git diff --exit-code ../docs/api/openapi.yaml \
+            || (echo "::error::docs/api/openapi.yaml устарел: запусти python backend/scripts/export_openapi.py" && exit 1)
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Копия контракта совпадает с docs/api
+        run: |
+          cmp ../docs/api/openapi.yaml openapi.yaml \
+            || (echo "::error::frontend/openapi.yaml отличается от docs/api/openapi.yaml" && exit 1)
+      - name: Типы API сгенерированы из контракта
+        run: |
+          npm run gen:api
+          git diff --exit-code src/api/schema.d.ts \
+            || (echo "::error::src/api/schema.d.ts устарел: запусти npm run gen:api" && exit 1)
+      - name: ESLint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  compose:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose up --build
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait --wait-timeout 300
+      - name: Сквозной тест
+        run: bash scripts/e2e.sh
+      - name: Логи при ошибке
+        if: failure()
+        run: docker compose ps -a && docker compose logs --tail 200
+      - name: Остановка
+        if: always()
+        run: docker compose down -v

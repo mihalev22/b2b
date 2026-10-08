@@ -1,0 +1,6 @@
+# Всегда LF: shell-скрипты и конфиги с CRLF ломаются внутри Linux-контейнеров
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.pdf binary
