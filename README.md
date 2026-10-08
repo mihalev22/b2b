@@ -22,11 +22,15 @@ docs/      контракты, ADR, метрики (..)
 
 ## Запуск
 
-Пока готов backend (api + worker + redis + postgres):
+Полный стек (frontend, api, worker, ml, redis, db) из корня репозитория:
 
 ```bash
-cd backend
-docker-compose up --build
+cp .env.example .env
+docker compose up --build
 ```
 
-Полный стек (6 сервисов) собирает архитектор. Примеры API-запросов — в `backend/README.md`.
+- Интерфейс: http://localhost:3000
+- API и Swagger: http://localhost:8000/docs
+- `ml` пока заглушка с `/health`, контракт `/embed` и `/classify` — за ИИ-инженером
+
+Примеры API-запросов — в `backend/README.md`.
