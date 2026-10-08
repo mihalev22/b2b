@@ -2,6 +2,8 @@
 # Запуск: cp .env.example .env && docker compose up --build
 # Интерфейс: http://localhost:3000, Swagger: http://localhost:8000/docs
 
+name: ktru
+
 x-backend-env: &backend-env
   DATABASE_URL: postgresql+psycopg://app:app@db:5432/ktru
   REDIS_URL: redis://redis:6379/0
