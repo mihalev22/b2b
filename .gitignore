@@ -18,6 +18,7 @@ data/*
 # …кроме тестовых образцов
 !backend/tests/fixtures/*
 !frontend/mocks/*
+!scripts/fixtures/*
 
 # node
 node_modules/
