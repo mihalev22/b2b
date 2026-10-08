@@ -99,7 +99,7 @@ Backend:
 cd backend
 pip install -r requirements.txt
 ruff check .
-pytest -q
+python -m pytest -q
 python scripts/export_openapi.py   # обновить docs/api/openapi.yaml
 ```
 
