@@ -20,9 +20,17 @@ docs/      контракты, ADR, метрики (..)
 3. PR маленькие: одна задача, ~до 400 строк
 4. Merge жмёт только .. — `main` всегда рабочий
 
-## Запуск (позже)
+## Запуск
+
+Полный стек (frontend, api, worker, ml, redis, db) из корня репозитория:
 
 ```bash
 cp .env.example .env
-docker-compose up --build
+docker compose up --build
 ```
+
+- Интерфейс: http://localhost:3000
+- API и Swagger: http://localhost:8000/docs
+- `ml` пока заглушка с `/health`, контракт `/embed` и `/classify` — за ИИ-инженером
+
+Примеры API-запросов — в `backend/README.md`.
