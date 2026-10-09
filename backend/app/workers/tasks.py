@@ -1,6 +1,9 @@
+import re
 import time
 import uuid
 from datetime import UTC, datetime
+
+from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.logging import get_logger, set_job_context
@@ -13,6 +16,63 @@ logger = get_logger(__name__)
 
 BATCH_SIZE = 100
 ACTIVE_STATUSES = ("processing", "done")
+CONFIDENCE_AUTO = 80.0
+CONFIDENCE_REVIEW = 50.0
+
+SEARCH_SQL = text(
+    "SELECT code, name FROM ktru_position "
+    "WHERE lower(name) LIKE lower(:pattern) "
+    "ORDER BY code LIMIT 5"
+)
+
+STOP_WORDS = {
+    "и", "в", "на", "с", "для", "от", "до", "по", "из", "у", "к", "за",
+    "при", "шт", "кг", "м", "мм", "см", "л", "гб", "мб",
+}
+
+
+def extract_keywords(raw_text: str) -> list[str]:
+    words = re.findall(r"[а-яёa-z0-9]{2,}", raw_text.lower())
+    return [w for w in words if w not in STOP_WORDS]
+
+
+def classify_item(session, raw_text: str) -> dict:
+    keywords = extract_keywords(raw_text)
+
+    candidates = []
+    seen_codes = set()
+    for kw in keywords[:5]:
+        rows = session.execute(SEARCH_SQL, {"pattern": f"%{kw}%"}).fetchall()
+        for row in rows:
+            if row[0] not in seen_codes:
+                seen_codes.add(row[0])
+                name_lower = row[1].lower() if row[1] else ""
+                kw_overlap = sum(1 for k in keywords if k in name_lower)
+                score = min(95.0, 40.0 + kw_overlap * 15.0)
+                candidates.append({"code": row[0], "name": row[1], "score": score})
+
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+    candidates = candidates[:5]
+
+    if not candidates:
+        return {"ktru_code": None, "ktru_name": None, "confidence": None,
+                "method": "search", "status": "needs_review", "candidates": []}
+
+    best = candidates[0]
+    status = "auto" if best["score"] >= CONFIDENCE_AUTO else "needs_review"
+
+    return {
+        "ktru_code": best["code"],
+        "ktru_name": best["name"],
+        "confidence": round(best["score"], 1),
+        "method": "search",
+        "status": status,
+        "candidates": [
+            {"ktru_code": c["code"], "ktru_name": c["name"],
+             "confidence": round(c["score"], 1)}
+            for c in candidates
+        ],
+    }
 
 
 @celery_app.task(name="jobs.process", acks_late=True)
@@ -45,21 +105,28 @@ def run_job(job_id: uuid.UUID, session_factory) -> dict:
                 )
             job.total_count = len(raw_items)
             session.commit()
+
             for start in range(0, len(raw_items), BATCH_SIZE):
                 chunk = raw_items[start : start + BATCH_SIZE]
-                session.add_all(
-                    [
+                for raw_item in chunk:
+                    result = classify_item(session, raw_item.raw_text)
+                    session.add(
                         Item(
                             job_id=job.id,
-                            row_number=item.row_number,
-                            raw_name=item.raw_text,
-                            raw_columns=item.columns,
+                            row_number=raw_item.row_number,
+                            raw_name=raw_item.raw_text,
+                            raw_columns=raw_item.columns,
+                            ktru_code=result["ktru_code"],
+                            ktru_name=result["ktru_name"],
+                            confidence=result["confidence"],
+                            method=result["method"],
+                            status=result["status"],
+                            candidates=result["candidates"],
                         )
-                        for item in chunk
-                    ]
-                )
+                    )
                 job.processed_count = min(start + BATCH_SIZE, len(raw_items))
                 session.commit()
+
             job.parse_seconds = round(time.perf_counter() - started, 3)
             job.status = "done"
             job.finished_at = datetime.now(UTC)
