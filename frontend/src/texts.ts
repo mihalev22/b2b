@@ -1,6 +1,11 @@
 // Все тексты интерфейса лежат в этом файле.
 // В компонентах строки не пишем — берём отсюда, чтобы термины были едиными.
 
+// Родительный падеж после «из» и «около»: «из 21 позиции», «из 154 позиций»
+function genitive(count: number, one: string, many: string): string {
+  return count % 10 === 1 && count % 100 !== 11 ? one : many;
+}
+
 export const texts = {
   appName: 'Классификатор КТРУ',
 
@@ -47,6 +52,39 @@ export const texts = {
     },
   },
 
+  progress: {
+    title: 'Обработка файла',
+    queued: 'Файл в очереди',
+    queuedHint: 'Обработка начнётся через несколько секунд.',
+    processing: 'Подбираем коды КТРУ',
+    counter: (done: number, total: number) =>
+      `Обработано ${done} из ${total} ${genitive(total, 'позиции', 'позиций')}`,
+    timeLeft: (seconds: number) => {
+      if (seconds < 5) return 'Осталось несколько секунд';
+      if (seconds < 60) {
+        return `Осталось около ${seconds} ${genitive(seconds, 'секунды', 'секунд')}`;
+      }
+      const minutes = Math.round(seconds / 60);
+      return `Осталось около ${minutes} ${genitive(minutes, 'минуты', 'минут')}`;
+    },
+    stayHint: 'Страницу можно закрыть — задание останется в «Истории».',
+    doneTitle: 'Файл обработан',
+    doneSummary: (total: number, auto: number, review: number) =>
+      `Всего позиций: ${total}. Подобрано автоматически: ${auto}. Нужна проверка: ${review}.`,
+    openResults: 'Открыть результаты',
+    emptyTitle: 'В файле не нашлось позиций',
+    emptyHint: 'Проверьте, что в файле есть таблица с наименованиями товаров, и загрузите его ещё раз.',
+    failedTitle: 'Не удалось обработать файл',
+    failedHint: 'Попробуйте загрузить файл ещё раз. Если ошибка повторится, сверьте его с файлом-образцом.',
+    uploadAnother: 'Загрузить другой файл',
+    notFoundTitle: 'Задание не найдено',
+    notFoundHint: 'Возможно, ссылка устарела. Откройте задание из «Истории» или загрузите файл заново.',
+    openHistory: 'Открыть историю',
+    errorTitle: 'Не получилось узнать, как идёт обработка',
+    errorHint: 'Проверьте подключение к интернету и попробуйте ещё раз.',
+    retry: 'Повторить',
+  },
+
   history: {
     title: 'История заданий',
     columns: {
@@ -63,10 +101,6 @@ export const texts = {
   },
 
   screens: {
-    progress: {
-      title: 'Обработка файла',
-      description: 'Здесь будет полоса прогресса и счётчик обработанных позиций.',
-    },
     results: {
       title: 'Результаты',
       description: 'Здесь будет таблица позиций с кодами КТРУ и уверенностью.',
