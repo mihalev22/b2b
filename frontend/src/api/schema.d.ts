@@ -348,9 +348,11 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "auto" | "needs_review" | "accepted" | "corrected";
+            status: "pending" | "auto" | "needs_review" | "accepted" | "corrected" | "failed";
             /** Candidates */
             candidates?: components["schemas"]["CandidateOut"][];
+            /** Failure Reason */
+            failure_reason?: string | null;
             /**
              * Updated At
              * Format: date-time

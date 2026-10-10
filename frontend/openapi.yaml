@@ -636,12 +636,18 @@ components:
           - needs_review
           - accepted
           - corrected
+          - failed
           title: Status
         candidates:
           items:
             $ref: '#/components/schemas/CandidateOut'
           type: array
           title: Candidates
+        failure_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failure Reason
         updated_at:
           type: string
           format: date-time

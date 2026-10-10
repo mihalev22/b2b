@@ -23,6 +23,15 @@ ACTIVE_STATUSES = ("processing", "done")
 CONFIDENCE_AUTO = 85.0
 CONFIDENCE_REVIEW = 50.0
 JOB_ERROR_MESSAGE = "Не удалось обработать файл. Проверьте формат и попробуйте снова."
+ITEM_FAILURE_MESSAGE = "Позицию не удалось классифицировать"
+FAILED_RESULT = {
+    "ktru_code": None,
+    "ktru_name": None,
+    "confidence": None,
+    "method": None,
+    "status": "failed",
+    "candidates": [],
+}
 
 SEARCH_SQL = text(
     "SELECT code, name FROM ktru_position "
@@ -114,7 +123,18 @@ def run_job(job_id: uuid.UUID, session_factory) -> dict:
             for start in range(0, len(raw_items), BATCH_SIZE):
                 chunk = raw_items[start : start + BATCH_SIZE]
                 for raw_item in chunk:
-                    result = classify_item(session, raw_item.raw_text)
+                    try:
+                        # SAVEPOINT: ошибка БД внутри позиции откатит только её,
+                        # иначе Postgres оставит транзакцию aborted и уронит весь файл.
+                        with session.begin_nested():
+                            result = classify_item(session, raw_item.raw_text)
+                        failure_reason = None
+                    except Exception:
+                        # Ошибка одной позиции не валит задание (ADR 0001).
+                        logger.exception("item failed: row=%s", raw_item.row_number)
+                        result = FAILED_RESULT
+                        failure_reason = ITEM_FAILURE_MESSAGE
+                        job.failed_count += 1
                     session.add(
                         Item(
                             job_id=job.id,
@@ -127,6 +147,7 @@ def run_job(job_id: uuid.UUID, session_factory) -> dict:
                             method=result["method"],
                             status=result["status"],
                             candidates=result["candidates"],
+                            failure_reason=failure_reason,
                         )
                     )
                 job.processed_count = min(start + BATCH_SIZE, len(raw_items))

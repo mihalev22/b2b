@@ -52,7 +52,7 @@ async def accept_item(
     session: AsyncSession = Depends(get_session),
 ) -> ItemOut:
     item = await get_item_or_404(session, item_id)
-    if item.status == "pending":
+    if item.status in ("pending", "failed"):
         raise HTTPException(409, "Позиция ещё не обработана, принять нельзя")
     item.status = "accepted"
     await session.commit()

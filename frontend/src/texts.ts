@@ -110,6 +110,7 @@ export const texts = {
     needs_review: 'Нужна проверка',
     accepted: 'Принято',
     corrected: 'Исправлено',
+    failed: 'Не обработана',
   },
 
   results: {
