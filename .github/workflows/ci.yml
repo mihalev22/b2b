@@ -33,6 +33,31 @@ jobs:
           git diff --exit-code ../docs/api/openapi.yaml \
             || (echo "::error::docs/api/openapi.yaml устарел: запусти python backend/scripts/export_openapi.py" && exit 1)
 
+  ml:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/requirements*.txt
+      # Пока в ml нет requirements-dev.txt, ставим линтер и pytest отдельно
+      - run: |
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          else
+            pip install -r requirements.txt ruff==0.14.0 pytest==8.4.2
+          fi
+      - name: Ruff
+        run: ruff check .
+      # Код 5 у pytest — «тестов не найдено», пока тестов в ml нет, это не ошибка
+      - name: Pytest
+        run: python -m pytest -q || [ $? -eq 5 ]
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -62,7 +87,7 @@ jobs:
 
   compose:
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, ml, frontend]
     steps:
       - uses: actions/checkout@v4
       - name: docker compose up --build
