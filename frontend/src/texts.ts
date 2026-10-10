@@ -111,8 +111,14 @@ export const texts = {
 
   results: {
     title: 'Результаты',
-    summary: (total: number, auto: number, review: number) =>
-      `Всего позиций: ${total}. Подобрано автоматически: ${auto}. Нужна проверка: ${review}.`,
+    filters: {
+      label: 'Показать позиции',
+      all: 'Все позиции',
+      allHint: 'Показать все позиции',
+      autoHint: 'Показать только позиции, подобранные автоматически',
+      reviewHint: 'Показать только позиции, которые нужно проверить',
+    },
+    emptyFiltered: 'Позиций с таким статусом нет',
     columns: {
       row: 'Строка',
       rawName: 'Исходная строка',

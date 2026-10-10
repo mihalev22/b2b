@@ -4,6 +4,8 @@ import type { TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Item, ItemStatus } from '../api/types';
+import StatusTiles from '../components/StatusTiles';
+import type { StatusFilter } from '../components/StatusTiles';
 import { confidenceZone } from '../confidence';
 import type { ConfidenceZone } from '../confidence';
 import { texts } from '../texts';
@@ -24,11 +26,15 @@ async function fetchJobInfo(jobId: string) {
   return data;
 }
 
-async function fetchItems(jobId: string, page: number) {
+async function fetchItems(jobId: string, page: number, status: StatusFilter) {
   const { data } = await api.GET('/api/v1/jobs/{job_id}/items', {
     params: {
       path: { job_id: jobId },
-      query: { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE },
+      query: {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        ...(status ? { status } : {}),
+      },
     },
   });
   if (!data) throw new Error('request-failed');
@@ -124,8 +130,11 @@ const columns: TableColumnsType<Item> = [
 export default function ResultsPage() {
   const { jobId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Номер страницы храним в адресе: ссылку можно переслать, а «Назад» работает как ожидается
+  // Страницу и фильтр храним в адресе: ссылку можно переслать, а «Назад» работает как ожидается
   const page = Math.max(1, Math.floor(Number(searchParams.get('page'))) || 1);
+  const statusParam = searchParams.get('status');
+  const status: StatusFilter =
+    statusParam === 'auto' || statusParam === 'needs_review' ? statusParam : null;
 
   const jobQuery = useQuery({
     queryKey: ['job-info', jobId],
@@ -137,15 +146,27 @@ export default function ResultsPage() {
   const isReady = job?.status === 'done';
 
   const itemsQuery = useQuery({
-    queryKey: ['items', jobId, page],
-    queryFn: () => fetchItems(jobId, page),
+    queryKey: ['items', jobId, page, status],
+    queryFn: () => fetchItems(jobId, page, status),
     enabled: isReady,
     placeholderData: keepPreviousData,
   });
 
+  function updateAddress(nextPage: number, nextStatus: StatusFilter) {
+    const params: Record<string, string> = {};
+    if (nextStatus) params.status = nextStatus;
+    if (nextPage > 1) params.page = String(nextPage);
+    setSearchParams(params);
+  }
+
   function changePage(nextPage: number) {
-    setSearchParams(nextPage > 1 ? { page: String(nextPage) } : {});
+    updateAddress(nextPage, status);
     window.scrollTo({ top: 0 });
+  }
+
+  // При смене фильтра возвращаемся на первую страницу
+  function changeStatus(nextStatus: StatusFilter) {
+    updateAddress(1, nextStatus);
   }
 
   if (!job) {
@@ -224,19 +245,32 @@ export default function ResultsPage() {
 
   return (
     <Card>
-      <Typography.Title level={2} style={{ marginTop: 0 }}>
-        {texts.results.title}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ wordBreak: 'break-word', marginBottom: 4 }}>
-        {job.filename}
-      </Typography.Paragraph>
-      <Typography.Paragraph>
-        {texts.results.summary(
-          job.total_count,
-          job.auto_count ?? 0,
-          job.needs_review_count ?? 0,
-        )}
-      </Typography.Paragraph>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <Typography.Title level={2} style={{ margin: 0 }}>
+            {texts.results.title}
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ wordBreak: 'break-word' }}>
+            {job.filename}
+          </Typography.Text>
+        </div>
+        <StatusTiles
+          total={job.total_count}
+          auto={job.auto_count ?? 0}
+          needsReview={job.needs_review_count ?? 0}
+          active={status}
+          onChange={changeStatus}
+        />
+      </div>
 
       {itemsQuery.isError && !itemsQuery.data ? (
         <Result
@@ -257,7 +291,7 @@ export default function ResultsPage() {
           dataSource={itemsQuery.data?.items}
           loading={itemsQuery.isFetching}
           scroll={{ x: TABLE_MIN_WIDTH }}
-          locale={{ emptyText: texts.results.empty }}
+          locale={{ emptyText: status ? texts.results.emptyFiltered : texts.results.empty }}
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
