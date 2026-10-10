@@ -103,6 +103,14 @@ python -m pytest -q
 python scripts/export_openapi.py   # обновить docs/api/openapi.yaml
 ```
 
+Ml:
+```bash
+cd ml
+pip install -r requirements-dev.txt   # пока его нет: pip install -r requirements.txt ruff pytest
+ruff check .
+python -m pytest -q
+```
+
 Frontend:
 ```bash
 cd frontend
