@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Card, Result, Skeleton, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Result, Skeleton, Table, Tag, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { JOB_NOT_FOUND, useJob } from '../api/jobs';
 import type { Item, ItemStatus } from '../api/types';
 import StatusTiles from '../components/StatusTiles';
 import type { StatusFilter } from '../components/StatusTiles';
@@ -13,18 +15,6 @@ import { texts } from '../texts';
 const PAGE_SIZE = 50;
 // Уже этой ширины таблица не сжимается, а прокручивается по горизонтали
 const TABLE_MIN_WIDTH = 1100;
-const NOT_FOUND = 'not-found';
-
-async function fetchJobInfo(jobId: string) {
-  const { data, response } = await api.GET('/api/v1/jobs/{job_id}', {
-    params: { path: { job_id: jobId } },
-  });
-  if (!data) {
-    const missing = response.status === 404 || response.status === 422;
-    throw new Error(missing ? NOT_FOUND : 'request-failed');
-  }
-  return data;
-}
 
 async function fetchItems(jobId: string, page: number, status: StatusFilter) {
   const { data } = await api.GET('/api/v1/jobs/{job_id}/items', {
@@ -51,11 +41,18 @@ const zoneColor: Record<ConfidenceZone, string> = {
 
 const statusColor: Record<ItemStatus, string> = {
   pending: 'default',
-  auto: 'default',
+  auto: 'success',
   needs_review: 'warning',
   accepted: 'success',
   corrected: 'processing',
 };
+
+function addressParams(page: number, status: StatusFilter): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (status) params.status = status;
+  if (page > 1) params.page = String(page);
+  return params;
+}
 
 function textOrDash(value: string | null | undefined) {
   return value ? value : texts.results.noValue;
@@ -136,13 +133,9 @@ export default function ResultsPage() {
   const status: StatusFilter =
     statusParam === 'auto' || statusParam === 'needs_review' ? statusParam : null;
 
-  const jobQuery = useQuery({
-    queryKey: ['job-info', jobId],
-    queryFn: () => fetchJobInfo(jobId),
-    retry: (failures, failure) => failure.message !== NOT_FOUND && failures < 2,
-  });
+  const jobQuery = useJob(jobId);
 
-  const job = jobQuery.data;
+  const job = jobQuery.data?.job;
   const isReady = job?.status === 'done';
 
   const itemsQuery = useQuery({
@@ -152,21 +145,23 @@ export default function ResultsPage() {
     placeholderData: keepPreviousData,
   });
 
-  function updateAddress(nextPage: number, nextStatus: StatusFilter) {
-    const params: Record<string, string> = {};
-    if (nextStatus) params.status = nextStatus;
-    if (nextPage > 1) params.page = String(nextPage);
-    setSearchParams(params);
-  }
+  // Страницы с таким номером нет (старая ссылка, ?page=999) — открываем последнюю
+  const total = itemsQuery.isPlaceholderData ? undefined : itemsQuery.data?.total;
+  const lastPage = total === undefined ? undefined : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  useEffect(() => {
+    if (lastPage !== undefined && page > lastPage) {
+      setSearchParams(addressParams(lastPage, status), { replace: true });
+    }
+  }, [lastPage, page, status, setSearchParams]);
 
   function changePage(nextPage: number) {
-    updateAddress(nextPage, status);
+    setSearchParams(addressParams(nextPage, status));
     window.scrollTo({ top: 0 });
   }
 
   // При смене фильтра возвращаемся на первую страницу
   function changeStatus(nextStatus: StatusFilter) {
-    updateAddress(1, nextStatus);
+    setSearchParams(addressParams(1, nextStatus));
   }
 
   if (!job) {
@@ -177,7 +172,7 @@ export default function ResultsPage() {
         </Card>
       );
     }
-    if (jobQuery.error?.message === NOT_FOUND) {
+    if (jobQuery.error?.message === JOB_NOT_FOUND) {
       return (
         <Card>
           <Result
@@ -271,6 +266,16 @@ export default function ResultsPage() {
           onChange={changeStatus}
         />
       </div>
+
+      {job.failed_count > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={texts.results.failedItemsTitle(job.failed_count, job.total_count)}
+          description={texts.results.failedItemsHint}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {itemsQuery.isError && !itemsQuery.data ? (
         <Result

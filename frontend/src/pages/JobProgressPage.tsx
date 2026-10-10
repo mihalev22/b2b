@@ -1,38 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Progress, Result, Skeleton, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Job } from '../api/types';
+import { JOB_NOT_FOUND, allFailed, secondsLeft, useJob } from '../api/jobs';
 import { texts } from '../texts';
-
-const POLL_INTERVAL_MS = 1500;
-const NOT_FOUND = 'not-found';
-
-async function fetchJob(jobId: string) {
-  const { data, response } = await api.GET('/api/v1/jobs/{job_id}', {
-    params: { path: { job_id: jobId } },
-  });
-  if (!data) {
-    const missing = response.status === 404 || response.status === 422;
-    throw new Error(missing ? NOT_FOUND : 'request-failed');
-  }
-  // Время ответа запоминаем здесь, чтобы по нему оценивать, сколько осталось
-  return { job: data, fetchedAt: Date.now() };
-}
-
-function isRunning(job: Job): boolean {
-  return job.status === 'queued' || job.status === 'processing';
-}
-
-// Оценка оставшегося времени по средней скорости с начала обработки
-function secondsLeft(job: Job, fetchedAt: number): number | null {
-  if (!job.started_at || job.processed_count === 0) return null;
-  const elapsed = (fetchedAt - Date.parse(job.started_at)) / 1000;
-  if (elapsed <= 0) return null;
-  const perItem = elapsed / job.processed_count;
-  return Math.round(perItem * (job.total_count - job.processed_count));
-}
 
 function UploadAnotherButton({ primary = false }: { primary?: boolean }) {
   return (
@@ -47,29 +17,21 @@ export default function JobProgressPage() {
   const navigate = useNavigate();
   const sawRunning = useRef(false);
 
-  const { data, isPending, error, refetch } = useQuery({
-    queryKey: ['job', jobId],
-    queryFn: () => fetchJob(jobId),
-    retry: (failures, failure) => failure.message !== NOT_FOUND && failures < 2,
-    // Опрашиваем сервер, пока задание в очереди или обрабатывается
-    refetchInterval: (query) => {
-      const current = query.state.data?.job;
-      return current && isRunning(current) ? POLL_INTERVAL_MS : false;
-    },
-  });
+  const { data, isPending, error, refetch } = useJob(jobId, { poll: true });
 
   const job = data?.job;
   const status = job?.status;
-  const hasItems = (job?.total_count ?? 0) > 0;
+  // Есть что показывать в таблице: позиции нашлись и хотя бы часть обработана
+  const hasResults = job ? job.total_count > 0 && !allFailed(job) : false;
 
   // Если человек дождался конца обработки на этом экране — сразу показываем результаты
   useEffect(() => {
     if (status === 'queued' || status === 'processing') {
       sawRunning.current = true;
-    } else if (status === 'done' && hasItems && sawRunning.current) {
+    } else if (status === 'done' && hasResults && sawRunning.current) {
       navigate(`/jobs/${jobId}/results`, { replace: true });
     }
-  }, [status, hasItems, jobId, navigate]);
+  }, [status, hasResults, jobId, navigate]);
 
   if (!job || !data) {
     if (isPending) {
@@ -79,7 +41,7 @@ export default function JobProgressPage() {
         </Card>
       );
     }
-    if (error?.message === NOT_FOUND) {
+    if (error?.message === JOB_NOT_FOUND) {
       return (
         <Card style={{ maxWidth: 720, margin: '0 auto' }}>
           <Result
@@ -130,7 +92,20 @@ export default function JobProgressPage() {
     );
   }
 
-  if (job.status === 'done' && !hasItems) {
+  if (allFailed(job)) {
+    return (
+      <Card style={{ maxWidth: 720, margin: '0 auto' }}>
+        <Result
+          status="error"
+          title={texts.progress.allFailedTitle}
+          subTitle={texts.progress.allFailedHint}
+          extra={<UploadAnotherButton primary />}
+        />
+      </Card>
+    );
+  }
+
+  if (job.status === 'done' && job.total_count === 0) {
     return (
       <Card style={{ maxWidth: 720, margin: '0 auto' }}>
         <Result
@@ -167,7 +142,7 @@ export default function JobProgressPage() {
   const isQueued = job.status === 'queued';
   const percent =
     job.total_count > 0 ? Math.floor((job.processed_count / job.total_count) * 100) : 0;
-  const left = secondsLeft(job, data.fetchedAt);
+  const left = secondsLeft(data);
 
   return (
     <Card style={{ maxWidth: 720, margin: '0 auto' }}>

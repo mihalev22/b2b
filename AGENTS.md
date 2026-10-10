@@ -103,6 +103,14 @@ python -m pytest -q
 python scripts/export_openapi.py   # обновить docs/api/openapi.yaml
 ```
 
+Ml:
+```bash
+cd ml
+pip install -r requirements-dev.txt   # пока его нет: pip install -r requirements.txt ruff pytest
+ruff check .
+python -m pytest -q
+```
+
 Заливка каталога КТРУ (после `docker compose up`, миграции применятся сами; файл `data/ktru_full.json` локальный, в git не лежит):
 ```bash
 docker compose run --rm -e PYTHONPATH=/srv -v ./data:/data -v ./scripts/catalog:/catalog api python /catalog/load_catalog.py /data/ktru_full.json
