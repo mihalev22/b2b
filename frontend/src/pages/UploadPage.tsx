@@ -8,7 +8,8 @@ import { texts } from '../texts';
 // Ограничения совпадают с серверными: api принимает файлы до 10 МБ и до 1000 позиций
 const MAX_UPLOAD_MB = 10;
 const MAX_ITEMS = 1000;
-const ALLOWED_EXTENSIONS = ['xlsx', 'csv', 'pdf'];
+// pdf сервер пока не принимает — вернём сюда, когда появится разбор pdf
+const ALLOWED_EXTENSIONS = ['xlsx', 'csv'];
 
 // Проверка до отправки: возвращает текст отказа или null, если файл подходит
 function validateFile(file: File): string | null {
@@ -129,7 +130,7 @@ export default function UploadPage() {
 
       <Typography.Paragraph style={{ margin: '16px 0 0' }}>
         {texts.upload.sampleQuestion}{' '}
-        <a href="/sample.csv" download="Образец спецификации.csv">
+        <a href="/sample.csv" download={texts.upload.sampleFileName}>
           {texts.upload.sampleLink}
         </a>
       </Typography.Paragraph>
