@@ -111,6 +111,12 @@ ruff check .
 python -m pytest -q
 ```
 
+Заливка каталога КТРУ (после `docker compose up`, миграции применятся сами; файл `data/ktru_full.json` локальный, в git не лежит):
+```bash
+docker compose run --rm -e PYTHONPATH=/srv -v ./data:/data -v ./scripts/catalog:/catalog api python /catalog/load_catalog.py /data/ktru_full.json
+```
+Сборщик каталога: `scripts/catalog/collect_tzfz.py` (пишет в `data/ktru_full.json`).
+
 Frontend:
 ```bash
 cd frontend

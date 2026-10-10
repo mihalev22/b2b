@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -14,6 +14,30 @@ from app.main import app
 from app.models.entities import Base
 from app.workers.tasks import run_job
 
+KTRU_TABLES = """
+CREATE TABLE IF NOT EXISTS ktru_position (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    okpd2_code TEXT,
+    okpd2_name TEXT,
+    status TEXT DEFAULT 'active',
+    source_url TEXT
+);
+INSERT OR IGNORE INTO ktru_position (code, name, okpd2_code) VALUES
+    ('26.20.11.110-00000001', 'Ноутбук', '26.20.11.110'),
+    ('26.20.11.110-00000002', 'Планшетный компьютер', '26.20.11.110'),
+    ('26.20.14.000-00000001', 'Сервер стоечный', '26.20.14.000');
+"""
+
+
+def _register_unicode_lower(dbapi_connection, _record):
+    # SQLite lower() знает только ASCII; Postgres понимает кириллицу.
+    # Регистрируем Unicode-версию, чтобы тесты вели себя как в Postgres.
+    dbapi_connection.create_function(
+        "lower", 1, lambda value: value.lower() if isinstance(value, str) else value
+    )
+
 
 @pytest.fixture
 def sync_factory(tmp_path):
@@ -21,7 +45,14 @@ def sync_factory(tmp_path):
         f"sqlite:///{tmp_path / 'test.db'}",
         connect_args={"check_same_thread": False},
     )
+    event.listen(engine, "connect", _register_unicode_lower)
     Base.metadata.create_all(engine)
+    with engine.connect() as conn:
+        for stmt in KTRU_TABLES.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                conn.execute(text(stmt))
+        conn.commit()
     factory = sessionmaker(engine, expire_on_commit=False)
     yield factory
     engine.dispose()
