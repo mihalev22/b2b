@@ -27,13 +27,18 @@ GET_SQL = text(
 )
 
 
+def like_pattern(query: str) -> str:
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 @router.get("/search", response_model=KtruSearchPage)
 async def search_catalog(
     session: AsyncSession = Depends(get_session),
     q: str = Query(..., min_length=2, max_length=256),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> KtruSearchPage:
-    pattern = f"%{q.strip()}%"
+    pattern = like_pattern(q.strip())
     count_result = await session.execute(COUNT_SQL, {"pattern": pattern})
     total = count_result.scalar() or 0
 
