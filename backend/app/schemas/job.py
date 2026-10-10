@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 JobStatus = Literal["queued", "processing", "done", "failed"]
-ItemStatus = Literal["pending", "auto", "needs_review", "accepted", "corrected"]
+ItemStatus = Literal["pending", "auto", "needs_review", "accepted", "corrected", "failed"]
 SortField = Literal["row_number", "confidence", "updated_at"]
 SortOrder = Literal["asc", "desc"]
 ExportFormat = Literal["csv", "xlsx"]
@@ -141,6 +141,7 @@ class ItemOut(BaseModel):
     method: str | None
     status: ItemStatus
     candidates: list[CandidateOut] = Field(default_factory=list)
+    failure_reason: str | None = None
     updated_at: datetime
 
     @field_validator("candidates", mode="before")
