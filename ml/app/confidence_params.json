@@ -1,0 +1,15 @@
+{
+  "calibrated": false,
+  "embedding_model": null,
+  "note": "Стартовые веса подобраны вручную, до калибровки на размеченной выборке",
+  "weights": {
+    "score": 25.0,
+    "margin": 40.0,
+    "lexical": 2.0
+  },
+  "bias": -23.0,
+  "thresholds": {
+    "high": 85.0,
+    "medium": 60.0
+  }
+}
