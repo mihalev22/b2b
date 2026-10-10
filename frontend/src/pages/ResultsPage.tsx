@@ -4,7 +4,7 @@ import { Alert, Button, Card, Result, Skeleton, Table, Tag, Typography } from 'a
 import type { TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { JOB_NOT_FOUND, useJob } from '../api/jobs';
+import { JOB_NOT_FOUND, allFailed, useJob } from '../api/jobs';
 import type { Item, ItemStatus } from '../api/types';
 import StatusTiles from '../components/StatusTiles';
 import type { StatusFilter } from '../components/StatusTiles';
@@ -136,7 +136,7 @@ export default function ResultsPage() {
   const jobQuery = useJob(jobId);
 
   const job = jobQuery.data?.job;
-  const isReady = job?.status === 'done';
+  const isReady = job?.status === 'done' && !allFailed(job);
 
   const itemsQuery = useQuery({
     queryKey: ['items', jobId, page, status],
@@ -211,6 +211,24 @@ export default function ResultsPage() {
           status="error"
           title={texts.results.failedTitle}
           subTitle={job.error ?? texts.results.failedHint}
+          extra={
+            <Link to="/">
+              <Button type="primary">{texts.results.uploadAnother}</Button>
+            </Link>
+          }
+        />
+      </Card>
+    );
+  }
+
+  // Обработка закончилась, но показывать нечего: ни у одной позиции нет результата
+  if (allFailed(job)) {
+    return (
+      <Card>
+        <Result
+          status="error"
+          title={texts.progress.allFailedTitle}
+          subTitle={texts.progress.allFailedHint}
           extra={
             <Link to="/">
               <Button type="primary">{texts.results.uploadAnother}</Button>

@@ -150,6 +150,8 @@ type JobRecord = {
   // static — готовое задание из примеров; live — «обрабатывается» после загрузки файла
   kind: 'static' | 'live';
   failedWith?: string;
+  // Сколько позиций «не обработалось»: задание при этом всё равно завершается
+  failedItems?: number;
 };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -159,6 +161,8 @@ const PROCESS_MS = 12000;
 const seedJobs: JobRecord[] = [
   { id: 'c82cc353-9233-4ba2-8270-4f0139f37774', filename: 'Спецификация_оргтехника.xlsx', createdAt: Date.now() - 2 * 60 * 60 * 1000, total: 1000, kind: 'static' },
   { id: '5b1f0c9e-7a34-4d21-9e55-0d8f1c2a7b10', filename: 'Канцтовары_4_квартал.csv', createdAt: Date.now() - DAY, total: 48, kind: 'static' },
+  { id: '3f6a1d52-8b7c-4e90-a1f3-2c5d7e9b0a41', filename: 'Часть_позиций_не_обработана.xlsx', createdAt: Date.now() - 5 * 60 * 60 * 1000, total: 120, kind: 'static', failedItems: 18 },
+  { id: '7c2e9b14-5a3d-4f68-9e07-1b4a6d8c3f25', filename: 'Все_позиции_упали.csv', createdAt: Date.now() - 2 * DAY, total: 40, kind: 'static', failedItems: 40 },
   { id: '9d3e6f12-4c8b-4f7a-b2a1-6e5d4c3b2a19', filename: 'Скан_заявки.pdf', createdAt: Date.now() - 3 * DAY, total: 0, kind: 'static', failedWith: 'Не удалось распознать таблицу в файле' },
 ];
 
@@ -185,10 +189,33 @@ const jobs: JobRecord[] = [...loadCreatedJobs(), ...seedJobs];
 const itemsByJob = new Map<string, Item[]>();
 const originals = new Map<string, Item>();
 
+// Упавшая позиция: кода и уверенности нет. Отдельного статуса в контракте пока нет,
+// поэтому она остаётся «в обработке» — так же сейчас ведёт себя настоящий сервер.
+function markFailed(items: Item[], failedItems: number): void {
+  const total = items.length;
+  items.forEach((item, index) => {
+    // Равномерно распределяем упавшие позиции по файлу
+    const isFailed =
+      Math.floor(((index + 1) * failedItems) / total) > Math.floor((index * failedItems) / total);
+    if (!isFailed) return;
+    item.ktru_code = null;
+    item.ktru_name = null;
+    item.confidence = null;
+    item.method = null;
+    item.status = 'pending';
+    item.candidates = [];
+  });
+}
+
+function failedSoFar(job: JobRecord): number {
+  return visibleItems(job).filter((item) => item.status === 'pending').length;
+}
+
 function allItems(job: JobRecord): Item[] {
   let items = itemsByJob.get(job.id);
   if (!items) {
     items = generateItems(job.id, job.total);
+    markFailed(items, job.failedItems ?? 0);
     itemsByJob.set(job.id, items);
   }
   return items;
@@ -226,7 +253,7 @@ function toJob(job: JobRecord): Job {
     status,
     total_count: job.total,
     processed_count: processed,
-    failed_count: 0,
+    failed_count: job.failedItems ? failedSoFar(job) : 0,
     auto_count: count('auto'),
     needs_review_count: count('needs_review'),
     corrected_count: count('corrected'),
@@ -284,13 +311,16 @@ export const db = {
     return job && toJob(job);
   },
 
-  // Подсказка для проверки экранов: если в имени файла есть «ошибка» или «error» —
-  // задание упадёт, если «пусто» или «empty» — в нём не окажется позиций.
+  // Подсказка для проверки экранов по имени файла:
+  //   «ошибка» или «error» — задание упадёт целиком;
+  //   «пусто» или «empty» — в файле не окажется позиций;
+  //   «сбой» или «fail» — задание завершится, но ни одна позиция не обработается.
   createJob(filename: string) {
     const id = crypto.randomUUID();
     const lower = filename.toLowerCase();
     const isEmpty = lower.includes('пуст') || lower.includes('empty');
     const isBroken = lower.includes('ошибк') || lower.includes('error');
+    const allItemsFail = lower.includes('сбой') || lower.includes('fail');
     const total = isEmpty || isBroken ? 0 : 60 + Math.floor(createRandom(hash(id))() * 340);
 
     jobs.unshift({
@@ -300,6 +330,7 @@ export const db = {
       total,
       kind: 'live',
       failedWith: isBroken ? 'Не удалось прочитать файл: неизвестная структура таблицы' : undefined,
+      failedItems: allItemsFail ? total : undefined,
     });
     saveCreatedJobs();
     return { job_id: id, status: 'queued' as const, filename };
