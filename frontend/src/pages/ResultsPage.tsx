@@ -9,6 +9,8 @@ import type { ConfidenceZone } from '../confidence';
 import { texts } from '../texts';
 
 const PAGE_SIZE = 50;
+// Уже этой ширины таблица не сжимается, а прокручивается по горизонтали
+const TABLE_MIN_WIDTH = 1100;
 const NOT_FOUND = 'not-found';
 
 async function fetchJobInfo(jobId: string) {
@@ -57,36 +59,35 @@ const columns: TableColumnsType<Item> = [
   {
     title: texts.results.columns.row,
     dataIndex: 'row_number',
-    width: 80,
+    width: 76,
     align: 'right',
   },
   {
     title: texts.results.columns.rawName,
     dataIndex: 'raw_name',
-    width: 280,
   },
   {
     title: texts.results.columns.name,
     key: 'name',
-    width: 160,
+    width: 140,
     render: (_, item) => textOrDash(item.attributes?.name),
   },
   {
     title: texts.results.columns.brand,
     key: 'brand',
-    width: 120,
+    width: 110,
     render: (_, item) => textOrDash(item.attributes?.brand),
   },
   {
     title: texts.results.columns.model,
     key: 'model',
-    width: 150,
+    width: 130,
     render: (_, item) => textOrDash(item.attributes?.model),
   },
   {
     title: texts.results.columns.ktru,
     key: 'ktru',
-    width: 280,
+    width: 240,
     render: (_, item) =>
       item.ktru_code ? (
         <>
@@ -100,7 +101,7 @@ const columns: TableColumnsType<Item> = [
   {
     title: texts.results.columns.confidence,
     dataIndex: 'confidence',
-    width: 130,
+    width: 124,
     align: 'right',
     render: (_, item) => (
       <Tag color={zoneColor[confidenceZone(item.confidence)]} style={{ marginInlineEnd: 0 }}>
@@ -113,7 +114,7 @@ const columns: TableColumnsType<Item> = [
   {
     title: texts.results.columns.status,
     dataIndex: 'status',
-    width: 160,
+    width: 150,
     render: (_, item) => (
       <Tag color={statusColor[item.status]}>{texts.itemStatus[item.status]}</Tag>
     ),
@@ -255,7 +256,7 @@ export default function ResultsPage() {
           columns={columns}
           dataSource={itemsQuery.data?.items}
           loading={itemsQuery.isFetching}
-          scroll={{ x: 'max-content' }}
+          scroll={{ x: TABLE_MIN_WIDTH }}
           locale={{ emptyText: texts.results.empty }}
           pagination={{
             current: page,
