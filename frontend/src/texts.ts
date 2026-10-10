@@ -100,16 +100,46 @@ export const texts = {
     retry: 'Повторить',
   },
 
-  screens: {
-    results: {
-      title: 'Результаты',
-      description: 'Здесь будет таблица позиций с кодами КТРУ и уверенностью.',
-    },
+  // Статусы позиции — как их видит пользователь
+  itemStatus: {
+    pending: 'В обработке',
+    auto: 'Подобрано',
+    needs_review: 'Нужна проверка',
+    accepted: 'Принято',
+    corrected: 'Исправлено',
   },
 
-  stub: {
-    badge: 'Экран в работе',
-    job: 'Задание',
+  results: {
+    title: 'Результаты',
+    summary: (total: number, auto: number, review: number) =>
+      `Всего позиций: ${total}. Подобрано автоматически: ${auto}. Нужна проверка: ${review}.`,
+    columns: {
+      row: 'Строка',
+      rawName: 'Исходная строка',
+      name: 'Наименование',
+      brand: 'Бренд',
+      model: 'Модель',
+      ktru: 'Код и наименование КТРУ',
+      confidence: 'Уверенность',
+      status: 'Статус',
+    },
+    percent: (value: number) => `${Math.round(value)} %`,
+    noValue: '—',
+    noCode: 'Код не подобран',
+    range: (from: number, to: number, total: number) => `${from}–${to} из ${total}`,
+    empty: 'В этом задании нет позиций',
+    stillRunningTitle: 'Файл ещё обрабатывается',
+    stillRunningHint: 'Таблица появится, когда обработка закончится.',
+    openProgress: 'Посмотреть ход обработки',
+    failedTitle: 'Этот файл не удалось обработать',
+    failedHint: 'Результатов нет. Загрузите файл ещё раз.',
+    uploadAnother: 'Загрузить другой файл',
+    notFoundTitle: 'Задание не найдено',
+    notFoundHint: 'Возможно, ссылка устарела. Откройте задание из «Истории» или загрузите файл заново.',
+    openHistory: 'Открыть историю',
+    errorTitle: 'Не получилось загрузить результаты',
+    errorHint: 'Проверьте подключение к интернету и попробуйте ещё раз.',
+    retry: 'Повторить',
   },
 
   notFound: {
