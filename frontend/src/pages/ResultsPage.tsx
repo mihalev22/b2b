@@ -45,6 +45,7 @@ const statusColor: Record<ItemStatus, string> = {
   needs_review: 'warning',
   accepted: 'success',
   corrected: 'processing',
+  failed: 'error',
 };
 
 function addressParams(page: number, status: StatusFilter): Record<string, string> {
