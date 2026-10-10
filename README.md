@@ -34,3 +34,13 @@ docker compose up --build
 - `ml` пока заглушка с `/health`, контракт `/embed` и `/classify` — за ИИ-инженером
 
 Примеры API-запросов — в `backend/README.md`.
+
+### Заливка каталога КТРУ
+
+Каталог (`data/ktru_full.json`) локальный, в git не лежит. Залить в БД из корня репозитория:
+
+```bash
+docker compose run --rm -e PYTHONPATH=/srv -v ./data:/data -v ./scripts/catalog:/catalog api python /catalog/load_catalog.py /data/ktru_full.json
+```
+
+Скрипт идемпотентен, запускать из контейнера (порт БД снаружи не открыт).

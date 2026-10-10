@@ -1,4 +1,4 @@
-﻿"""╨С╤Л╤Б╤В╤А╤Л╨╣ ╤Б╨▒╨╛╤А ╨┐╨╛╨╗╨╜╨╛╨│╨╛ ╨║╨░╤В╨░╨╗╨╛╨│╨░ ╨Ъ╨в╨а╨г ╤З╨╡╤А╨╡╨╖ API tzfz.ru (60k+ ╨┐╨╛╨╖╨╕╤Ж╨╕╨╣ ╨╖╨░ ~30 ╨╝╨╕╨╜)."""
+"""Быстрый сбор полного каталога КТРУ через API tzfz.ru (60k+ позиций за ~30 мин)."""
 import json
 import sys
 import time
@@ -47,7 +47,7 @@ def main():
         with open(OUTPUT, encoding="utf-8") as f:
             state = json.load(f)
             all_items = state.get("items", {})
-        print(f"╨Я╤А╨╛╨┤╨╛╨╗╨╢╨░╤О: {len(all_items)} ╤Г╨╢╨╡ ╤Б╨╛╨▒╤А╨░╨╜╨╛")
+        print(f"Продолжаю: {len(all_items)} уже собрано")
 
     done_prefixes = set()
     if OUTPUT.exists():
@@ -65,14 +65,14 @@ def main():
                 all_items[code] = item
                 new += 1
 
-        print(f"[{prefix}] {len(items)} ╨┐╨╛╨╖╨╕╤Ж╨╕╨╣, ╨╜╨╛╨▓╤Л╤Е {new}, ╨▓╤Б╨╡╨│╨╛ {len(all_items)}", flush=True)
+        print(f"[{prefix}] {len(items)} позиций, новых {new}, всего {len(all_items)}", flush=True)
         done_prefixes.add(prefix)
 
         if len(all_items) % 1000 < 100 or prefix == ALL_PREFIXES[-1]:
             save(all_items, done_prefixes)
 
     save(all_items, done_prefixes)
-    print(f"\n╨У╨Ю╨в╨Ю╨Т╨Ю: {len(all_items)} ╨┐╨╛╨╖╨╕╤Ж╨╕╨╣")
+    print(f"\nГОТОВО: {len(all_items)} позиций")
     return 0
 
 

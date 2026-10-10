@@ -1,10 +1,13 @@
 """Загрузка локального JSON-каталога КТРУ в таблицу ktru_position.
 
-Запуск (из корня репозитория, после `alembic upgrade head`):
-    python scripts/catalog/load_catalog.py data/ktru_full.json
+Рабочая команда (проверено), из корня репозитория, при поднятом docker compose:
 
-Переменная DATABASE_URL берётся из окружения или backend/.env.
-Скрипт идемпотентен: существующие коды обновляются, новые добавляются.
+    docker compose run --rm -e PYTHONPATH=/srv -v ./data:/data -v ./scripts/catalog:/catalog \
+        api python /catalog/load_catalog.py /data/ktru_full.json
+
+Таблица должна существовать (миграция 0002, выполняется при старте api).
+Запуск вне контейнера не поддерживается: порт БД снаружи не открыт, модуль app
+видит только контейнер api. Скрипт идемпотентен: существующие коды обновляются.
 """
 
 import json
@@ -13,7 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 
-DEFAULT_SOURCE = Path("data/ktru_full.json")
+DEFAULT_SOURCE = Path("/data/ktru_full.json")
 BATCH = 1000
 
 
@@ -44,7 +47,7 @@ def main(argv: list[str]) -> int:
     rows = [r for r in (normalize(i) for i in data["items"].values()) if r]
     print(f"Позиций к загрузке: {len(rows)}")
 
-    engine = create_engine(get_settings().database_url.replace("+asyncpg", "+psycopg"))
+    engine = create_engine(get_settings().database_url)
     stmt = text(
         "INSERT INTO ktru_position (code, name, okpd2_code, status, source_url) "
         "VALUES (:code, :name, :okpd2_code, :status, :source_url) "
