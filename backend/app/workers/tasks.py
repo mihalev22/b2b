@@ -124,7 +124,10 @@ def run_job(job_id: uuid.UUID, session_factory) -> dict:
                 chunk = raw_items[start : start + BATCH_SIZE]
                 for raw_item in chunk:
                     try:
-                        result = classify_item(session, raw_item.raw_text)
+                        # SAVEPOINT: ошибка БД внутри позиции откатит только её,
+                        # иначе Postgres оставит транзакцию aborted и уронит весь файл.
+                        with session.begin_nested():
+                            result = classify_item(session, raw_item.raw_text)
                         failure_reason = None
                     except Exception:
                         # Ошибка одной позиции не валит задание (ADR 0001).
