@@ -16,8 +16,13 @@ logger = get_logger(__name__)
 
 BATCH_SIZE = 100
 ACTIVE_STATUSES = ("processing", "done")
-CONFIDENCE_AUTO = 80.0
+# Порог автопринятия согласован с фронтом и ml: 85.
+# ВРЕМЕННО: классификация ниже — локальный поиск по каталогу, без ml.
+# Уверенность «40 + 15 × совпадения слов» — НЕ настоящая вероятность,
+# её заменит ml (Егор) через needs_review и зону из /classify.
+CONFIDENCE_AUTO = 85.0
 CONFIDENCE_REVIEW = 50.0
+JOB_ERROR_MESSAGE = "Не удалось обработать файл. Проверьте формат и попробуйте снова."
 
 SEARCH_SQL = text(
     "SELECT code, name FROM ktru_position "
@@ -133,12 +138,21 @@ def run_job(job_id: uuid.UUID, session_factory) -> dict:
             session.commit()
             logger.info("job done: total=%s, seconds=%s", job.total_count, job.parse_seconds)
             return {"job_id": str(job_id), "status": "done", "total": job.total_count}
-        except Exception as exc:
+        except ParserError as exc:
             session.rollback()
             job = session.get(Job, job_id)
             job.status = "failed"
             job.error = str(exc)[:2000]
             job.finished_at = datetime.now(UTC)
             session.commit()
-            logger.exception("job failed")
+            logger.warning("job rejected: %s", exc)
+            return {"job_id": str(job_id), "status": "failed", "error": job.error}
+        except Exception:
+            session.rollback()
+            job = session.get(Job, job_id)
+            job.status = "failed"
+            job.error = JOB_ERROR_MESSAGE
+            job.finished_at = datetime.now(UTC)
+            session.commit()
+            logger.exception("job failed: job_id=%s", job_id)
             return {"job_id": str(job_id), "status": "failed", "error": job.error}

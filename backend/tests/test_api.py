@@ -177,11 +177,15 @@ async def test_items_sorting_and_filters(client):
     )
     assert sorted_desc.json()["items"][0]["raw_name"] == "Кабель ПВС 3х1.5"
 
-    filtered = await client.get(
+    # Позиции из CSV_CONTENT: «Dell» (ноутбук в каталоге) и «Кабель» (в каталоге нет).
+    # Уверенность кандидата у первой ниже 85 (не auto), у второй — нет кандидатов.
+    high = await client.get(
         f"/api/v1/jobs/{job_id}/items",
-        params={"min_confidence": 50},
+        params={"min_confidence": 85},
     )
-    assert filtered.json()["total"] == 0
+    assert high.json()["total"] == 0
+    all_items = await client.get(f"/api/v1/jobs/{job_id}/items")
+    assert all_items.json()["total"] == 2
 
 
 async def test_xlsx_export(client):
